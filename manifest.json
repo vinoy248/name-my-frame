@@ -1,0 +1,8 @@
+{
+  "name": "Name My Frame",
+  "id": "name-my-frame",
+  "api": "1.0.0",
+  "main": "dist/code.js",
+  "ui": "dist/ui.html",
+  "editorType": ["figma"]
+}

@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2017", "DOM"],
+    "jsx": "react-jsx",
+    "types": ["@testing-library/jest-dom"]
+  },
+  "include": ["src/ui/**/*", "src/shared/**/*", "tests/**/*"]
+}
