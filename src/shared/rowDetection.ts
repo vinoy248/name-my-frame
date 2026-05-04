@@ -49,21 +49,26 @@ export function classifyFrames(frames: FrameInfo[]): ClassifiedFrames {
   const allRows = detectRows(frames)
   const mainRows: FrameInfo[][] = []
   const subFrameMap = new Map<string, FrameInfo[]>()
+  // Track bottom of the last processed row (main or sub) so that consecutive
+  // sub-rows with varying heights don't get mis-classified as main rows when
+  // measured against the tallest frame in the original main row.
+  let lastRowBottom = -Infinity
 
   for (const row of allRows) {
     const rowTop = Math.min(...row.map(f => f.y))
+    const rowBottom = Math.max(...row.map(f => f.y + f.height))
 
     if (mainRows.length === 0) {
       mainRows.push(row)
+      lastRowBottom = rowBottom
       continue
     }
 
-    const lastMainRow = mainRows[mainRows.length - 1]
-    const lastMainBottom = Math.max(...lastMainRow.map(f => f.y + f.height))
-    const clearance = rowTop - lastMainBottom
+    const clearance = rowTop - lastRowBottom
 
     if (clearance >= 0 && clearance < 800) {
-      // Sub-row: each frame assigned to closest parent by X center
+      // Sub-row: each frame assigned to closest parent by X center in last main row
+      const lastMainRow = mainRows[mainRows.length - 1]
       for (const sub of row) {
         const subCenter = sub.x + sub.width / 2
         let bestParent = lastMainRow[0]
@@ -82,6 +87,8 @@ export function classifyFrames(frames: FrameInfo[]): ClassifiedFrames {
     } else {
       mainRows.push(row)
     }
+
+    lastRowBottom = rowBottom
   }
 
   for (const [key, subs] of subFrameMap) {
