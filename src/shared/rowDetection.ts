@@ -75,7 +75,7 @@ export function classifyFrames(frames: FrameInfo[]): ClassifiedFrames {
             bestParent = mainFrame
           }
         }
-        const existing = subFrameMap.get(bestParent.id) ?? []
+        const existing = subFrameMap.get(bestParent.id) || []
         existing.push(sub)
         subFrameMap.set(bestParent.id, existing)
       }
@@ -100,7 +100,7 @@ export function assignSubFrameNames(classified: ClassifiedFrames, baseNumber: nu
       const frameName = `${base}.${frameIndex + 1}`
       names.set(frame.id, frameName)
 
-      const subs = classified.subFrameMap.get(frame.id) ?? []
+      const subs = classified.subFrameMap.get(frame.id) || []
       subs.forEach((sub, subIndex) => {
         names.set(sub.id, `${frameName} ${String.fromCharCode(65 + subIndex)}`)
       })

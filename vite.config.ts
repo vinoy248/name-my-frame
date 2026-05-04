@@ -16,6 +16,7 @@ export default defineConfig(({ mode }) => {
         outDir: 'dist',
         emptyOutDir: false,
         minify: false,
+        target: 'es2019',
       },
     }
   }
