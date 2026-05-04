@@ -40,7 +40,15 @@ async function init() {
 
 figma.on('selectionchange', sendSelectionUpdate)
 
+// init() is triggered by UI_READY from the UI once it has mounted
+// This avoids INIT/SELECTION_CHANGE messages arriving before the UI message listener is set up
+
 figma.ui.onmessage = async (msg: PluginMessage) => {
+  if (msg.type === 'UI_READY') {
+    await init()
+    return
+  }
+
   if (msg.type !== 'RENAME_REQUEST') return
 
   const { baseNumber } = msg
@@ -89,5 +97,3 @@ figma.ui.onmessage = async (msg: PluginMessage) => {
     })
   }
 }
-
-init()

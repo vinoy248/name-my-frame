@@ -91,14 +91,15 @@ describe('classifyFrames', () => {
   })
 
   it('all frames in rows → subFrameMap empty', () => {
-    const frames = [f('a', 0, 0), f('b', 200, 0), f('c', 0, 600)]
+    // clearance from row1 bottom(100) to row2 top(1000) = 900 ≥ 800 → two main rows
+    const frames = [f('a', 0, 0), f('b', 200, 0), f('c', 0, 1000)]
     const result = classifyFrames(frames)
     expect(result.mainRows).toHaveLength(2)
     expect(result.subFrameMap.size).toBe(0)
   })
 
-  it('sub-frame clearance < 400 → classified as sub', () => {
-    // parent bottom = y(0) + height(100) = 100; sub top = 200 → clearance = 100 < 400
+  it('sub-frame clearance < 800 → classified as sub', () => {
+    // parent bottom = y(0) + height(100) = 100; sub top = 200 → clearance = 100 < 800
     const parent = f('p', 0, 0)
     const sub = f('s', 0, 200)
     const result = classifyFrames([parent, sub])
@@ -107,18 +108,19 @@ describe('classifyFrames', () => {
     expect(result.subFrameMap.get('p')![0].id).toBe('s')
   })
 
-  it('clearance exactly 400 → treated as main, not sub', () => {
-    // parent bottom = 100; sub top = 500 → clearance = 400 → NOT sub
+  it('clearance exactly 800 → treated as main, not sub', () => {
+    // parent bottom = 100; frame top = 900 → clearance = 800 → NOT sub
     const parent = f('p', 0, 0)
-    const border = f('b', 0, 500)
+    const border = f('b', 0, 900)
     const result = classifyFrames([parent, border])
     expect(result.mainRows).toHaveLength(2)
     expect(result.subFrameMap.size).toBe(0)
   })
 
-  it('clearance > 400 → treated as new main row', () => {
+  it('clearance > 800 → treated as new main row', () => {
+    // parent bottom = 100; frame top = 1000 → clearance = 900 ≥ 800 → main
     const parent = f('p', 0, 0)
-    const extra = f('e', 0, 600)
+    const extra = f('e', 0, 1000)
     const result = classifyFrames([parent, extra])
     expect(result.mainRows).toHaveLength(2)
     expect(result.subFrameMap.size).toBe(0)
@@ -145,13 +147,13 @@ describe('classifyFrames', () => {
   })
 
   it('two main rows each with their own sub-row', () => {
-    // row1 at y=0, sub1 at y=150 (clearance=50 < 400 → sub of row1)
-    // row2 at y=700 (clearance from row1 bottom = 600 > 400 → main)
-    // sub2 at y=850 (clearance from row2 bottom = 50 < 400 → sub of row2)
+    // row1 at y=0, sub1 at y=150 (clearance=50 < 800 → sub of row1)
+    // row2 at y=1100 (clearance from row1 bottom = 1000 ≥ 800 → main)
+    // sub2 at y=1250 (clearance from row2 bottom = 50 < 800 → sub of row2)
     const r1 = f('r1', 0, 0)
     const s1 = f('s1', 0, 150)
-    const r2 = f('r2', 0, 700)
-    const s2 = f('s2', 0, 850)
+    const r2 = f('r2', 0, 1100)
+    const s2 = f('s2', 0, 1250)
     const result = classifyFrames([r1, s1, r2, s2])
     expect(result.mainRows).toHaveLength(2)
     expect(result.subFrameMap.get('r1')).toHaveLength(1)
@@ -174,7 +176,8 @@ describe('classifyFrames', () => {
 
 describe('assignSubFrameNames', () => {
   it('no sub-frames → same result as assignNames', () => {
-    const frames = [f('a', 0, 0), f('b', 200, 0), f('c', 0, 600)]
+    // clearance 900 ≥ 800 → two main rows, no subs
+    const frames = [f('a', 0, 0), f('b', 200, 0), f('c', 0, 1000)]
     const classified = classifyFrames(frames)
     const names = assignSubFrameNames(classified, 31)
     expect(names.get('a')).toBe('31.1')

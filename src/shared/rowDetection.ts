@@ -62,7 +62,7 @@ export function classifyFrames(frames: FrameInfo[]): ClassifiedFrames {
     const lastMainBottom = Math.max(...lastMainRow.map(f => f.y + f.height))
     const clearance = rowTop - lastMainBottom
 
-    if (clearance >= 0 && clearance < 400) {
+    if (clearance >= 0 && clearance < 800) {
       // Sub-row: each frame assigned to closest parent by X center
       for (const sub of row) {
         const subCenter = sub.x + sub.width / 2

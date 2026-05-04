@@ -8,6 +8,7 @@ export interface FrameInfo {
 }
 
 export type PluginMessage =
+  | { type: 'UI_READY' }
   | { type: 'INIT'; lastBaseNumber: number | null }
   | { type: 'SELECTION_CHANGE'; frames: FrameInfo[] }
   | { type: 'RENAME_REQUEST'; baseNumber: number }

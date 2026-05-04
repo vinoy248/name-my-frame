@@ -66,6 +66,7 @@ export function App() {
     }
 
     window.addEventListener('message', handler)
+    parent.postMessage({ pluginMessage: { type: 'UI_READY' } }, '*')
     return () => window.removeEventListener('message', handler)
   }, [])
 
