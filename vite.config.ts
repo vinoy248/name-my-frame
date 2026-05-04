@@ -21,6 +21,8 @@ export default defineConfig(({ mode }) => {
     }
   }
 
+  // UI runs in Figma's Chromium iframe (ES2020+ supported), so no target downlevel needed.
+  // code.ts uses es2019 because the plugin sandbox (QuickJS-based) rejects ?? and other ES2020 syntax.
   return {
     plugins: [react(), viteSingleFile()],
     root: path.resolve(__dirname, 'src/ui'),

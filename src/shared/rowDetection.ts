@@ -102,7 +102,7 @@ export function assignSubFrameNames(classified: ClassifiedFrames, baseNumber: nu
 
       const subs = classified.subFrameMap.get(frame.id) || []
       subs.forEach((sub, subIndex) => {
-        names.set(sub.id, `${frameName} ${String.fromCharCode(65 + subIndex)}`)
+        names.set(sub.id, `${frameName} ${String.fromCharCode(65 + subIndex)}`) // A–Z; max 26 sub-frames per parent
       })
     })
   })

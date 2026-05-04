@@ -135,6 +135,31 @@ describe('classifyFrames', () => {
     expect(subs[1].id).toBe('sr')
   })
 
+  it('overlapping frame (negative clearance) → treated as new main row', () => {
+    // frame overlaps last main row bottom — clearance is negative → new main, not sub
+    const main = f('m', 0, 0)        // bottom = 100
+    const overlap = f('o', 0, 50)    // y=50, clearance = 50 - 100 = -50
+    const result = classifyFrames([main, overlap])
+    expect(result.mainRows).toHaveLength(2)
+    expect(result.subFrameMap.size).toBe(0)
+  })
+
+  it('two main rows each with their own sub-row', () => {
+    // row1 at y=0, sub1 at y=150 (clearance=50 < 400 → sub of row1)
+    // row2 at y=700 (clearance from row1 bottom = 600 > 400 → main)
+    // sub2 at y=850 (clearance from row2 bottom = 50 < 400 → sub of row2)
+    const r1 = f('r1', 0, 0)
+    const s1 = f('s1', 0, 150)
+    const r2 = f('r2', 0, 700)
+    const s2 = f('s2', 0, 850)
+    const result = classifyFrames([r1, s1, r2, s2])
+    expect(result.mainRows).toHaveLength(2)
+    expect(result.subFrameMap.get('r1')).toHaveLength(1)
+    expect(result.subFrameMap.get('r1')![0].id).toBe('s1')
+    expect(result.subFrameMap.get('r2')).toHaveLength(1)
+    expect(result.subFrameMap.get('r2')![0].id).toBe('s2')
+  })
+
   it('sub-frame assigned to nearest parent by X center', () => {
     // two main frames side by side in same row; sub is closer to p2 by X
     const p1 = f('p1', 0, 0)         // x=0, center=50
