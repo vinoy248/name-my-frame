@@ -2,6 +2,7 @@ export interface PreviewItem {
   id: string
   newName: string
   originalName: string
+  isSubFrame?: boolean
 }
 
 interface PreviewListProps {
@@ -21,8 +22,8 @@ export function PreviewList({ items, dimmed = false }: PreviewListProps) {
   return (
     <ul className={`preview-list${dimmed ? ' preview-list--dimmed' : ''}`}>
       {items.map(item => (
-        <li key={item.id} className="preview-item">
-          <span className="preview-item__new-name">{item.newName}</span>
+        <li key={item.id} className={`preview-item${item.isSubFrame ? ' preview-item--sub' : ''}`}>
+          <span className="preview-item__new-name">{item.isSubFrame ? `→ ${item.newName}` : item.newName}</span>
           <span className="preview-item__original">{item.originalName}</span>
         </li>
       ))}

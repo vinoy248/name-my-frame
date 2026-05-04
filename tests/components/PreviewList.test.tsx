@@ -29,4 +29,30 @@ describe('PreviewList', () => {
     render(<PreviewList items={items} dimmed />)
     expect(screen.getByRole('list')).toHaveClass('preview-list--dimmed')
   })
+
+  it('sub-frame item shows → prefix in name', () => {
+    const mixedItems = [
+      { id: '1', newName: '31.1', originalName: 'Main', isSubFrame: false },
+      { id: '2', newName: '31.1 A', originalName: 'Error', isSubFrame: true },
+    ]
+    render(<PreviewList items={mixedItems} />)
+    expect(screen.getByText('→ 31.1 A')).toBeInTheDocument()
+  })
+
+  it('sub-frame item has preview-item--sub class', () => {
+    const mixedItems = [
+      { id: '1', newName: '31.1', originalName: 'Main', isSubFrame: false },
+      { id: '2', newName: '31.1 A', originalName: 'Error', isSubFrame: true },
+    ]
+    const { container } = render(<PreviewList items={mixedItems} />)
+    const listItems = container.querySelectorAll('li')
+    expect(listItems[0]).not.toHaveClass('preview-item--sub')
+    expect(listItems[1]).toHaveClass('preview-item--sub')
+  })
+
+  it('non-sub-frame renders name without → prefix', () => {
+    render(<PreviewList items={items} />)
+    expect(screen.getByText('31.1')).toBeInTheDocument()
+    expect(screen.queryByText('→ 31.1')).not.toBeInTheDocument()
+  })
 })

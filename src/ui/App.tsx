@@ -3,7 +3,7 @@ import { NumberInput } from './components/NumberInput'
 import { PreviewList } from './components/PreviewList'
 import type { PreviewItem } from './components/PreviewList'
 import { StatusBanner } from './components/StatusBanner'
-import { detectRows, assignNames } from '../shared/rowDetection'
+import { classifyFrames, assignSubFrameNames } from '../shared/rowDetection'
 import type { FrameInfo, PluginMessage } from '../shared/types'
 
 interface Status {
@@ -13,13 +13,19 @@ interface Status {
 
 function computePreview(frames: FrameInfo[], baseNumber: number): PreviewItem[] {
   if (frames.length === 0 || baseNumber < 1) return []
-  const rows = detectRows(frames)
-  const nameMap = assignNames(rows, baseNumber)
-  return frames.map(fr => ({
-    id: fr.id,
-    newName: nameMap.get(fr.id) ?? fr.name,
-    originalName: fr.name,
-  }))
+  const classified = classifyFrames(frames)
+  const nameMap = assignSubFrameNames(classified, baseNumber)
+  const items: PreviewItem[] = []
+  classified.mainRows.forEach(row => {
+    row.forEach(fr => {
+      items.push({ id: fr.id, newName: nameMap.get(fr.id) ?? fr.name, originalName: fr.name, isSubFrame: false })
+      const subs = classified.subFrameMap.get(fr.id) ?? []
+      subs.forEach(sub => {
+        items.push({ id: sub.id, newName: nameMap.get(sub.id) ?? sub.name, originalName: sub.name, isSubFrame: true })
+      })
+    })
+  })
+  return items
 }
 
 export function App() {

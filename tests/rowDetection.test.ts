@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { detectRows, assignNames } from '../src/shared/rowDetection'
+import { detectRows, assignNames, classifyFrames, assignSubFrameNames } from '../src/shared/rowDetection'
 import type { FrameInfo } from '../src/shared/types'
 
 function f(id: string, x: number, y: number, width = 100, height = 100): FrameInfo {
@@ -80,5 +80,112 @@ describe('assignNames', () => {
     const names = assignNames([row], 5)
     expect(names.get('f9')).toBe('5.10')
     expect(names.get('f10')).toBe('5.11')
+  })
+})
+
+describe('classifyFrames', () => {
+  it('empty input returns empty result', () => {
+    const result = classifyFrames([])
+    expect(result.mainRows).toHaveLength(0)
+    expect(result.subFrameMap.size).toBe(0)
+  })
+
+  it('all frames in rows → subFrameMap empty', () => {
+    const frames = [f('a', 0, 0), f('b', 200, 0), f('c', 0, 600)]
+    const result = classifyFrames(frames)
+    expect(result.mainRows).toHaveLength(2)
+    expect(result.subFrameMap.size).toBe(0)
+  })
+
+  it('sub-frame clearance < 400 → classified as sub', () => {
+    // parent bottom = y(0) + height(100) = 100; sub top = 200 → clearance = 100 < 400
+    const parent = f('p', 0, 0)
+    const sub = f('s', 0, 200)
+    const result = classifyFrames([parent, sub])
+    expect(result.mainRows).toHaveLength(1)
+    expect(result.subFrameMap.get('p')).toHaveLength(1)
+    expect(result.subFrameMap.get('p')![0].id).toBe('s')
+  })
+
+  it('clearance exactly 400 → treated as main, not sub', () => {
+    // parent bottom = 100; sub top = 500 → clearance = 400 → NOT sub
+    const parent = f('p', 0, 0)
+    const border = f('b', 0, 500)
+    const result = classifyFrames([parent, border])
+    expect(result.mainRows).toHaveLength(2)
+    expect(result.subFrameMap.size).toBe(0)
+  })
+
+  it('clearance > 400 → treated as new main row', () => {
+    const parent = f('p', 0, 0)
+    const extra = f('e', 0, 600)
+    const result = classifyFrames([parent, extra])
+    expect(result.mainRows).toHaveLength(2)
+    expect(result.subFrameMap.size).toBe(0)
+  })
+
+  it('multiple sub-frames under same parent → sorted left-to-right', () => {
+    const parent = f('p', 100, 0)
+    const subRight = f('sr', 200, 200)
+    const subLeft = f('sl', 0, 200)
+    const result = classifyFrames([parent, subRight, subLeft])
+    const subs = result.subFrameMap.get('p')!
+    expect(subs).toHaveLength(2)
+    expect(subs[0].id).toBe('sl')
+    expect(subs[1].id).toBe('sr')
+  })
+
+  it('sub-frame assigned to nearest parent by X center', () => {
+    // two main frames side by side in same row; sub is closer to p2 by X
+    const p1 = f('p1', 0, 0)         // x=0, center=50
+    const p2 = f('p2', 500, 0)       // x=500, center=550
+    const sub = f('s', 480, 200)     // center=530 → closer to p2 (dist=20) than p1 (dist=480)
+    const result = classifyFrames([p1, p2, sub])
+    expect(result.mainRows).toHaveLength(1)
+    expect(result.subFrameMap.has('p2')).toBe(true)
+    expect(result.subFrameMap.has('p1')).toBe(false)
+  })
+})
+
+describe('assignSubFrameNames', () => {
+  it('no sub-frames → same result as assignNames', () => {
+    const frames = [f('a', 0, 0), f('b', 200, 0), f('c', 0, 600)]
+    const classified = classifyFrames(frames)
+    const names = assignSubFrameNames(classified, 31)
+    expect(names.get('a')).toBe('31.1')
+    expect(names.get('b')).toBe('31.2')
+    expect(names.get('c')).toBe('32.1')
+  })
+
+  it('one sub-frame → gets parent name + A', () => {
+    const parent = f('p', 0, 0)
+    const sub = f('s', 0, 200)
+    const classified = classifyFrames([parent, sub])
+    const names = assignSubFrameNames(classified, 10)
+    expect(names.get('p')).toBe('10.1')
+    expect(names.get('s')).toBe('10.1 A')
+  })
+
+  it('multiple sub-frames → sequential A, B, C', () => {
+    const parent = f('p', 100, 0)
+    const s1 = f('s1', 0, 200)
+    const s2 = f('s2', 200, 200)
+    const s3 = f('s3', 400, 200)
+    const classified = classifyFrames([parent, s1, s2, s3])
+    const names = assignSubFrameNames(classified, 5)
+    expect(names.get('s1')).toBe('5.1 A')
+    expect(names.get('s2')).toBe('5.1 B')
+    expect(names.get('s3')).toBe('5.1 C')
+  })
+
+  it('sub-frames named after their specific parent frame', () => {
+    const p1 = f('p1', 0, 0)
+    const p2 = f('p2', 200, 0)
+    const sub1 = f('sub1', 0, 200)   // under p1 (clearance 100 < 200)
+    const sub2 = f('sub2', 200, 200) // under p2
+    const classified = classifyFrames([p1, p2, sub1, sub2])
+    const names = assignSubFrameNames(classified, 31)
+    expect(names.get('sub1')).toBe('31.1 A')
+    expect(names.get('sub2')).toBe('31.2 A')
   })
 })

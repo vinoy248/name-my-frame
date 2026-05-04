@@ -1,4 +1,4 @@
-import { detectRows, assignNames } from './shared/rowDetection'
+import { classifyFrames, assignSubFrameNames } from './shared/rowDetection'
 import type { FrameInfo, PluginMessage } from './shared/types'
 
 figma.showUI(__html__, { width: 280, height: 380, title: 'Name My Frame' })
@@ -52,22 +52,28 @@ figma.ui.onmessage = async (msg: PluginMessage) => {
   }
 
   const frameInfos = frames.map(toFrameInfo)
-  const rows = detectRows(frameInfos)
-  const nameMap = assignNames(rows, baseNumber)
+  const classified = classifyFrames(frameInfos)
+  const nameMap = assignSubFrameNames(classified, baseNumber)
+
+  // Collect all frame nodes including sub-frames
+  const allFrameIds = [...nameMap.keys()]
+  const allFrames = allFrameIds
+    .map(id => figma.getNodeById(id))
+    .filter((n): n is FrameNode => n !== null && n.type === 'FRAME')
 
   // Snapshot for rollback
-  const snapshot = frames.map(fr => ({ id: fr.id, name: fr.name }))
+  const snapshot = allFrames.map(fr => ({ id: fr.id, name: fr.name }))
 
   try {
     // All mutations in a single onmessage handler are one undo step in Figma
-    for (const frame of frames) {
+    for (const frame of allFrames) {
       const newName = nameMap.get(frame.id)
       if (newName !== undefined) {
         frame.name = newName
       }
     }
     await figma.clientStorage.setAsync(STORAGE_KEY, baseNumber)
-    postToUI({ type: 'RENAME_RESULT', success: true, count: frames.length })
+    postToUI({ type: 'RENAME_RESULT', success: true, count: allFrames.length })
   } catch (err) {
     // Rollback all renames
     for (const { id, name } of snapshot) {
