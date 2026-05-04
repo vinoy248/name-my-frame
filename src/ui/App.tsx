@@ -89,6 +89,10 @@ export function App() {
     parent.postMessage({ pluginMessage: msg }, '*')
   }
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleRename()
+  }
+
   const handleBaseNumberChange = (value: number) => {
     setBaseNumber(value)
     setStatus({ type: null, message: '' })
@@ -96,7 +100,7 @@ export function App() {
 
   if (!hasFrames) {
     return (
-      <div className="plugin-container plugin-container--empty">
+      <div className="plugin-container plugin-container--empty" onKeyDown={handleKeyDown}>
         <div className="empty-state">
           <div className="empty-state__icon">⬚</div>
           <p className="empty-state__message">Select frames to rename</p>
@@ -109,7 +113,7 @@ export function App() {
   }
 
   return (
-    <div className="plugin-container">
+    <div className="plugin-container" onKeyDown={handleKeyDown}>
       <NumberInput value={baseNumber} onChange={handleBaseNumberChange} disabled={isLoading} />
       <PreviewList items={preview} dimmed={status.type === 'success'} />
       {status.type && <StatusBanner type={status.type} message={status.message} />}
