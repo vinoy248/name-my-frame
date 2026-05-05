@@ -214,3 +214,38 @@ body {
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+.mode-toggle {
+  display: flex;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.mode-toggle__tab {
+  flex: 1;
+  padding: 6px 0;
+  font-size: 12px;
+  font-weight: 500;
+  border: none;
+  background: var(--color-bg);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-family: var(--font);
+  transition: background 0.15s, color 0.15s;
+}
+
+.mode-toggle__tab--active {
+  background: var(--color-primary);
+  color: #ffffff;
+}
+
+.bottom-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.status-area {
+  min-height: 34px;
+}

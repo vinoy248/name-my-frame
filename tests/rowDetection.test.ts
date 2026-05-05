@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { detectRows, assignNames, classifyFrames, assignSubFrameNames } from '../src/shared/rowDetection'
+import { detectRows, assignNames, classifyFrames, assignSubFrameNames, indexToLetters, assignLetterModeNames } from '../src/shared/rowDetection'
 import type { FrameInfo } from '../src/shared/types'
 
 function f(id: string, x: number, y: number, width = 100, height = 100): FrameInfo {
@@ -215,5 +215,71 @@ describe('assignSubFrameNames', () => {
     const names = assignSubFrameNames(classified, 31)
     expect(names.get('sub1')).toBe('31.1 A')
     expect(names.get('sub2')).toBe('31.2 A')
+  })
+})
+
+describe('indexToLetters', () => {
+  it('1 → A', () => expect(indexToLetters(1)).toBe('A'))
+  it('26 → Z', () => expect(indexToLetters(26)).toBe('Z'))
+  it('27 → AA', () => expect(indexToLetters(27)).toBe('AA'))
+  it('28 → AB', () => expect(indexToLetters(28)).toBe('AB'))
+  it('52 → AZ', () => expect(indexToLetters(52)).toBe('AZ'))
+  it('53 → BA', () => expect(indexToLetters(53)).toBe('BA'))
+})
+
+describe('assignLetterModeNames', () => {
+  it('returns empty map for fewer than 2 frames', () => {
+    const result = assignLetterModeNames([f('a', 0, 0)])
+    expect(result.size).toBe(0)
+  })
+
+  it('renames frames 2..n with parent name + letter, sorted by Y', () => {
+    const parent = { ...f('p', 0, 100), name: '9.6' }
+    const child1 = { ...f('c1', 0, 300), name: 'Hero' }
+    const child2 = { ...f('c2', 0, 500), name: 'Footer' }
+    const result = assignLetterModeNames([parent, child1, child2])
+    expect(result.has('p')).toBe(false)
+    expect(result.get('c1')).toBe('9.6 A')
+    expect(result.get('c2')).toBe('9.6 B')
+  })
+
+  it('sorts by Y regardless of input order', () => {
+    const bottom = { ...f('b', 0, 500), name: 'Bottom' }
+    const parent = { ...f('p', 0, 0), name: '3.2' }
+    const middle = { ...f('m', 0, 250), name: 'Middle' }
+    const result = assignLetterModeNames([bottom, parent, middle])
+    expect(result.has('p')).toBe(false)
+    expect(result.get('m')).toBe('3.2 A')
+    expect(result.get('b')).toBe('3.2 B')
+  })
+
+  it('26 frames → last gets Z', () => {
+    const frames = Array.from({ length: 27 }, (_, i) => ({
+      ...f(`f${i}`, 0, i * 100),
+      name: i === 0 ? '5.1' : `Frame ${i}`,
+    }))
+    const result = assignLetterModeNames(frames)
+    expect(result.get('f26')).toBe('5.1 Z')
+  })
+
+  it('27th child gets AA', () => {
+    const frames = Array.from({ length: 28 }, (_, i) => ({
+      ...f(`f${i}`, 0, i * 100),
+      name: i === 0 ? '5.1' : `Frame ${i}`,
+    }))
+    const result = assignLetterModeNames(frames)
+    expect(result.get('f27')).toBe('5.1 AA')
+  })
+
+  it('renames regardless of existing X.Y names', () => {
+    const frames = [
+      { ...f('a', 0, 0), name: '9.6' },
+      { ...f('b', 0, 200), name: '10.1' },
+      { ...f('c', 0, 400), name: '12.4' },
+    ]
+    const result = assignLetterModeNames(frames)
+    expect(result.has('a')).toBe(false)
+    expect(result.get('b')).toBe('9.6 A')
+    expect(result.get('c')).toBe('9.6 B')
   })
 })

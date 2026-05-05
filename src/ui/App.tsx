@@ -3,7 +3,8 @@ import { NumberInput } from './components/NumberInput'
 import { PreviewList } from './components/PreviewList'
 import type { PreviewItem } from './components/PreviewList'
 import { StatusBanner } from './components/StatusBanner'
-import { classifyFrames, assignSubFrameNames } from '../shared/rowDetection'
+import { ModeToggle } from './components/ModeToggle'
+import { classifyFrames, assignSubFrameNames, assignLetterModeNames } from '../shared/rowDetection'
 import type { FrameInfo, PluginMessage } from '../shared/types'
 
 interface Status {
@@ -11,7 +12,7 @@ interface Status {
   message: string
 }
 
-function computePreview(frames: FrameInfo[], baseNumber: number): PreviewItem[] {
+function computeDefaultPreview(frames: FrameInfo[], baseNumber: number): PreviewItem[] {
   if (frames.length === 0 || baseNumber < 1) return []
   const classified = classifyFrames(frames)
   const nameMap = assignSubFrameNames(classified, baseNumber)
@@ -28,7 +29,20 @@ function computePreview(frames: FrameInfo[], baseNumber: number): PreviewItem[] 
   return items
 }
 
+function computeSubFramePreview(frames: FrameInfo[]): PreviewItem[] {
+  if (frames.length === 0) return []
+  const sorted = [...frames].sort((a, b) => a.y - b.y)
+  const nameMap = assignLetterModeNames(frames)
+  return sorted.map((fr, i) => ({
+    id: fr.id,
+    newName: i === 0 ? fr.name : (nameMap.get(fr.id) ?? fr.name),
+    originalName: fr.name,
+    isSubFrame: i > 0,
+  }))
+}
+
 export function App() {
+  const [mode, setMode] = useState<'default' | 'subframe'>('default')
   const [frames, setFrames] = useState<FrameInfo[]>([])
   const [baseNumber, setBaseNumber] = useState<number>(1)
   const [preview, setPreview] = useState<PreviewItem[]>([])
@@ -37,13 +51,18 @@ export function App() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const framesRef = useRef<FrameInfo[]>(frames)
   const baseNumberRef = useRef<number>(baseNumber)
+  const modeRef = useRef<'default' | 'subframe'>('default')
   const pendingNextBaseRef = useRef<number | null>(null)
 
   useEffect(() => { framesRef.current = frames }, [frames])
   useEffect(() => { baseNumberRef.current = baseNumber }, [baseNumber])
+  useEffect(() => { modeRef.current = mode }, [mode])
 
   const hasFrames = frames.length > 0
-  const canRename = hasFrames && baseNumber >= 1 && !isLoading
+
+  // In default mode: need frames + valid baseNumber
+  // In subframe mode: need at least 1 frame (validation happens server-side on click)
+  const canRename = hasFrames && !isLoading && (mode === 'subframe' || baseNumber >= 1)
 
   // Receive messages from Figma sandbox
   useEffect(() => {
@@ -56,7 +75,7 @@ export function App() {
           setBaseNumber(msg.lastBaseNumber)
         }
       } else if (msg.type === 'SELECTION_CHANGE') {
-        if (pendingNextBaseRef.current !== null) {
+        if (modeRef.current === 'default' && pendingNextBaseRef.current !== null) {
           setBaseNumber(pendingNextBaseRef.current)
           pendingNextBaseRef.current = null
         }
@@ -65,8 +84,10 @@ export function App() {
       } else if (msg.type === 'RENAME_RESULT') {
         setIsLoading(false)
         if (msg.success) {
-          const numMainRows = classifyFrames(framesRef.current).mainRows.length
-          pendingNextBaseRef.current = baseNumberRef.current + numMainRows
+          if (modeRef.current === 'default') {
+            const numMainRows = classifyFrames(framesRef.current).mainRows.length
+            pendingNextBaseRef.current = baseNumberRef.current + numMainRows
+          }
           setStatus({
             type: 'success',
             message: `Renamed ${msg.count} frame${msg.count === 1 ? '' : 's'}`,
@@ -83,22 +104,31 @@ export function App() {
   }, [])
 
   // Debounced preview update
-  const updatePreview = useCallback((currentFrames: FrameInfo[], num: number) => {
+  const updatePreview = useCallback((currentFrames: FrameInfo[], num: number, currentMode: 'default' | 'subframe') => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => {
-      setPreview(computePreview(currentFrames, num))
+      if (currentMode === 'subframe') {
+        setPreview(computeSubFramePreview(currentFrames))
+      } else {
+        setPreview(computeDefaultPreview(currentFrames, num))
+      }
     }, 150)
   }, [])
 
   useEffect(() => {
-    updatePreview(frames, baseNumber)
-  }, [frames, baseNumber, updatePreview])
+    updatePreview(frames, baseNumber, mode)
+  }, [frames, baseNumber, mode, updatePreview])
 
   const handleRename = () => {
     if (!canRename) return
     setIsLoading(true)
-    const msg: PluginMessage = { type: 'RENAME_REQUEST', baseNumber }
-    parent.postMessage({ pluginMessage: msg }, '*')
+    if (mode === 'subframe') {
+      const msg: PluginMessage = { type: 'RENAME_REQUEST', mode: 'subframe' }
+      parent.postMessage({ pluginMessage: msg }, '*')
+    } else {
+      const msg: PluginMessage = { type: 'RENAME_REQUEST', mode: 'default', baseNumber }
+      parent.postMessage({ pluginMessage: msg }, '*')
+    }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -111,28 +141,44 @@ export function App() {
     pendingNextBaseRef.current = null
   }
 
+  const handleModeChange = (newMode: 'default' | 'subframe') => {
+    setMode(newMode)
+    setStatus({ type: null, message: '' })
+  }
+
   if (!hasFrames) {
     return (
       <div className="plugin-container plugin-container--empty" onKeyDown={handleKeyDown}>
+        <ModeToggle mode={mode} onChange={handleModeChange} />
         <div className="empty-state">
           <div className="empty-state__icon">⬚</div>
           <p className="empty-state__message">Select frames to rename</p>
         </div>
-        <button className="btn btn--primary" disabled>
-          Rename Frames
-        </button>
+        <div className="bottom-bar">
+          <div className="status-area" />
+          <button className="btn btn--primary" disabled>
+            Rename Frames
+          </button>
+        </div>
       </div>
     )
   }
 
   return (
     <div className="plugin-container" onKeyDown={handleKeyDown}>
-      <NumberInput value={baseNumber} onChange={handleBaseNumberChange} disabled={isLoading} />
+      <ModeToggle mode={mode} onChange={handleModeChange} />
+      {mode === 'default' && (
+        <NumberInput value={baseNumber} onChange={handleBaseNumberChange} disabled={isLoading} />
+      )}
       <PreviewList items={preview} dimmed={status.type === 'success'} />
-      {status.type && <StatusBanner type={status.type} message={status.message} />}
-      <button className="btn btn--primary" onClick={handleRename} disabled={!canRename}>
-        {isLoading ? 'Renaming...' : 'Rename Frames'}
-      </button>
+      <div className="bottom-bar">
+        <div className="status-area">
+          {status.type && <StatusBanner type={status.type} message={status.message} />}
+        </div>
+        <button className="btn btn--primary" onClick={handleRename} disabled={!canRename}>
+          {isLoading ? 'Renaming...' : 'Rename Frames'}
+        </button>
+      </div>
     </div>
   )
 }

@@ -116,3 +116,25 @@ export function assignSubFrameNames(classified: ClassifiedFrames, baseNumber: nu
 
   return names
 }
+
+export function indexToLetters(n: number): string {
+  // 1→"A", 2→"B", ..., 26→"Z", 27→"AA", 28→"AB", etc.
+  let result = ''
+  while (n > 0) {
+    n--
+    result = String.fromCharCode(65 + (n % 26)) + result
+    n = Math.floor(n / 26)
+  }
+  return result
+}
+
+export function assignLetterModeNames(frames: FrameInfo[]): Map<string, string> {
+  const nameMap = new Map<string, string>()
+  if (frames.length < 2) return nameMap
+  const sorted = [...frames].sort((a, b) => a.y - b.y)
+  const parentName = sorted[0].name
+  for (let i = 1; i < sorted.length; i++) {
+    nameMap.set(sorted[i].id, `${parentName} ${indexToLetters(i)}`)
+  }
+  return nameMap
+}
