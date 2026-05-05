@@ -35,6 +35,12 @@ export function App() {
   const [status, setStatus] = useState<Status>({ type: null, message: '' })
   const [isLoading, setIsLoading] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const framesRef = useRef<FrameInfo[]>(frames)
+  const baseNumberRef = useRef<number>(baseNumber)
+  const pendingNextBaseRef = useRef<number | null>(null)
+
+  useEffect(() => { framesRef.current = frames }, [frames])
+  useEffect(() => { baseNumberRef.current = baseNumber }, [baseNumber])
 
   const hasFrames = frames.length > 0
   const canRename = hasFrames && baseNumber >= 1 && !isLoading
@@ -50,11 +56,17 @@ export function App() {
           setBaseNumber(msg.lastBaseNumber)
         }
       } else if (msg.type === 'SELECTION_CHANGE') {
+        if (pendingNextBaseRef.current !== null) {
+          setBaseNumber(pendingNextBaseRef.current)
+          pendingNextBaseRef.current = null
+        }
         setFrames(msg.frames)
         setStatus({ type: null, message: '' })
       } else if (msg.type === 'RENAME_RESULT') {
         setIsLoading(false)
         if (msg.success) {
+          const numMainRows = classifyFrames(framesRef.current).mainRows.length
+          pendingNextBaseRef.current = baseNumberRef.current + numMainRows
           setStatus({
             type: 'success',
             message: `Renamed ${msg.count} frame${msg.count === 1 ? '' : 's'}`,
@@ -96,6 +108,7 @@ export function App() {
   const handleBaseNumberChange = (value: number) => {
     setBaseNumber(value)
     setStatus({ type: null, message: '' })
+    pendingNextBaseRef.current = null
   }
 
   if (!hasFrames) {

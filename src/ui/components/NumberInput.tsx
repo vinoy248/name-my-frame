@@ -1,3 +1,5 @@
+import { useState, useEffect } from 'react'
+
 interface NumberInputProps {
   value: number
   onChange: (value: number) => void
@@ -5,8 +7,16 @@ interface NumberInputProps {
 }
 
 export function NumberInput({ value, onChange, disabled = false }: NumberInputProps) {
+  const [inputValue, setInputValue] = useState(String(value))
+
+  useEffect(() => {
+    setInputValue(String(value))
+  }, [value])
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const parsed = parseInt(e.target.value, 10)
+    const raw = e.target.value
+    setInputValue(raw)
+    const parsed = parseInt(raw, 10)
     if (!isNaN(parsed) && parsed >= 1 && parsed <= 9999) {
       onChange(parsed)
     }
@@ -20,7 +30,7 @@ export function NumberInput({ value, onChange, disabled = false }: NumberInputPr
         type="number"
         min={1}
         max={9999}
-        value={value || ''}
+        value={inputValue}
         onChange={handleChange}
         disabled={disabled}
         className="number-input"
