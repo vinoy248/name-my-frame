@@ -312,6 +312,16 @@ describe('detectRows — extended', () => {
     expect(rows[1][0].id).toBe('b')
   })
 
+  it('regression(6f957cb): frames with same relative Y but different absolute Y → different rows', () => {
+    // Bug: code.ts used frame.y (relative to parent section) — frames in two different Figma
+    // sections both had y≈100 relative to their section, collapsing to one row.
+    // Fix: use absoluteBoundingBox — canonical canvas coords differ, two rows correctly detected.
+    const rows = detectRows([f('section1', 0, 100), f('section2', 0, 8500)])
+    expect(rows).toHaveLength(2)
+    expect(rows[0][0].id).toBe('section1') // upper on canvas = first row → gets base number
+    expect(rows[1][0].id).toBe('section2') // lower on canvas = second row → gets base+1
+  })
+
   it('input in reverse Y order → output still top-to-bottom', () => {
     const rows = detectRows([
       f('z', 0, 900),
