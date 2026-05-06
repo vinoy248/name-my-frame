@@ -12,11 +12,12 @@ function getSelectedFrames(): FrameNode[] {
 }
 
 function toFrameInfo(frame: FrameNode): FrameInfo {
+  const abs = frame.absoluteBoundingBox
   return {
     id: frame.id,
     name: frame.name,
-    x: frame.x,
-    y: frame.y,
+    x: abs?.x ?? frame.x,
+    y: abs?.y ?? frame.y,
     width: frame.width,
     height: frame.height,
   }
