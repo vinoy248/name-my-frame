@@ -283,3 +283,132 @@ describe('assignLetterModeNames', () => {
     expect(result.get('c')).toBe('9.6 B')
   })
 })
+
+// ─── Extended coverage ────────────────────────────────────────────────────────
+
+describe('detectRows — extended', () => {
+  it('three distinct rows sorted top-to-bottom', () => {
+    const rows = detectRows([f('c', 0, 2000), f('a', 0, 0), f('b', 0, 1000)])
+    expect(rows).toHaveLength(3)
+    expect(rows[0][0].id).toBe('a')
+    expect(rows[1][0].id).toBe('b')
+    expect(rows[2][0].id).toBe('c')
+  })
+
+  it('negative Y coordinates — sorted correctly', () => {
+    // Figma canvas allows frames at negative coordinates
+    const rows = detectRows([f('b', 0, 0), f('a', 0, -500)])
+    expect(rows).toHaveLength(2)
+    expect(rows[0][0].id).toBe('a') // Y=-500 is above Y=0
+    expect(rows[1][0].id).toBe('b')
+  })
+
+  it('large canvas Y gap (cross-section simulation) — two distinct rows', () => {
+    // Simulates absoluteBoundingBox coords for frames in two Figma sections
+    // far apart on the canvas (e.g. 8000px apart)
+    const rows = detectRows([f('b', 0, 8500), f('a', 0, 100)])
+    expect(rows).toHaveLength(2)
+    expect(rows[0][0].id).toBe('a')
+    expect(rows[1][0].id).toBe('b')
+  })
+
+  it('input in reverse Y order → output still top-to-bottom', () => {
+    const rows = detectRows([
+      f('z', 0, 900),
+      f('y', 0, 600),
+      f('x', 0, 300),
+      f('w', 0, 0),
+    ])
+    expect(rows.map(r => r[0].id)).toEqual(['w', 'x', 'y', 'z'])
+  })
+
+  it('multiple frames per row, mixed input order → each row sorted left-to-right', () => {
+    const rows = detectRows([
+      f('r2b', 200, 400), f('r1b', 200, 0),
+      f('r2a', 0, 400),   f('r1a', 0, 0),
+    ])
+    expect(rows).toHaveLength(2)
+    expect(rows[0].map(fr => fr.id)).toEqual(['r1a', 'r1b'])
+    expect(rows[1].map(fr => fr.id)).toEqual(['r2a', 'r2b'])
+  })
+})
+
+describe('classifyFrames — extended', () => {
+  it('cross-section: clearance 5000px → two main rows, no subs', () => {
+    // Simulates two Figma sections far apart on canvas
+    const row1 = [f('a', 0, 0), f('b', 200, 0)]       // section 1, abs Y ≈ 0
+    const row2 = [f('c', 0, 5100), f('d', 200, 5100)]  // section 2, abs Y ≈ 5100
+    const result = classifyFrames([...row2, ...row1])
+    expect(result.mainRows).toHaveLength(2)
+    expect(result.subFrameMap.size).toBe(0)
+    expect(result.mainRows[0].map(fr => fr.id)).toEqual(['a', 'b'])
+    expect(result.mainRows[1].map(fr => fr.id)).toEqual(['c', 'd'])
+  })
+
+  it('three main rows in correct top-to-bottom order', () => {
+    const r1 = f('r1', 0, 0)
+    const r2 = f('r2', 0, 1000)   // clearance 900 ≥ 800 → main
+    const r3 = f('r3', 0, 2500)   // clearance 1400 ≥ 800 → main
+    const result = classifyFrames([r3, r1, r2])
+    expect(result.mainRows).toHaveLength(3)
+    expect(result.mainRows[0][0].id).toBe('r1')
+    expect(result.mainRows[1][0].id).toBe('r2')
+    expect(result.mainRows[2][0].id).toBe('r3')
+  })
+
+  it('sub-frame assigned to second main row (not first)', () => {
+    // r1 at y=0 (bottom=100), r2 at y=1000 (bottom=1100) → clearance 900 ≥ 800 → r2 main
+    // sub at y=1200 → clearance from r2 bottom (1100) = 100 < 800 → sub of r2
+    const r1 = f('r1', 100, 0)
+    const r2 = f('r2', 100, 1000)
+    const sub = f('s', 100, 1200)
+    const result = classifyFrames([r1, r2, sub])
+    expect(result.mainRows).toHaveLength(2)
+    expect(result.subFrameMap.has('r2')).toBe(true)
+    expect(result.subFrameMap.get('r2')![0].id).toBe('s')
+    expect(result.subFrameMap.has('r1')).toBe(false)
+  })
+
+  it('single frame → one main row, no subs', () => {
+    const result = classifyFrames([f('a', 0, 0)])
+    expect(result.mainRows).toHaveLength(1)
+    expect(result.mainRows[0][0].id).toBe('a')
+    expect(result.subFrameMap.size).toBe(0)
+  })
+})
+
+describe('assignNames — extended', () => {
+  it('three rows increment base by 1 each', () => {
+    const names = assignNames([[f('a', 0, 0)], [f('b', 0, 1000)], [f('c', 0, 2000)]], 7)
+    expect(names.get('a')).toBe('7.1')
+    expect(names.get('b')).toBe('8.1')
+    expect(names.get('c')).toBe('9.1')
+  })
+
+  it('large base number (9999) does not overflow', () => {
+    const names = assignNames([[f('a', 0, 0), f('b', 100, 0)]], 9999)
+    expect(names.get('a')).toBe('9999.1')
+    expect(names.get('b')).toBe('9999.2')
+  })
+})
+
+describe('assignSubFrameNames — extended', () => {
+  it('three main rows → base, base+1, base+2', () => {
+    // clearances all ≥ 800 → three main rows
+    const frames = [f('a', 0, 0), f('b', 0, 1000), f('c', 0, 2500)]
+    const classified = classifyFrames(frames)
+    const names = assignSubFrameNames(classified, 5)
+    expect(names.get('a')).toBe('5.1')
+    expect(names.get('b')).toBe('6.1')
+    expect(names.get('c')).toBe('7.1')
+  })
+
+  it('26 sub-frames under one parent → last gets Z', () => {
+    const parent = f('p', 0, 0)
+    const subs = Array.from({ length: 26 }, (_, i) => f(`s${i}`, i * 10, 200))
+    const classified = classifyFrames([parent, ...subs])
+    const names = assignSubFrameNames(classified, 1)
+    expect(names.get('s0')).toBe('1.1 A')
+    expect(names.get('s25')).toBe('1.1 Z')
+  })
+})
