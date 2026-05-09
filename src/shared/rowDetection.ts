@@ -76,7 +76,7 @@ export function classifyFrames(frames: FrameInfo[]): ClassifiedFrames {
 
       const bottom = colBottom.get(bestParent.id) ?? (bestParent.y + bestParent.height)
       const clearance = sub.y - bottom
-      if (clearance < 0 || clearance >= 800) { isSubRow = false; break }
+      if (clearance >= 800) { isSubRow = false; break }
       assignments.push({ sub, parent: bestParent })
     }
 

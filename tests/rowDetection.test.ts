@@ -137,13 +137,15 @@ describe('classifyFrames', () => {
     expect(subs[1].id).toBe('sr')
   })
 
-  it('overlapping frame (negative clearance) → treated as new main row', () => {
-    // frame overlaps last main row bottom — clearance is negative → new main, not sub
+  it('overlapping frame (negative clearance) → treated as sub of nearest parent column', () => {
+    // Sub-frame starts within the parent frame's vertical extent (tall parent).
+    // clearance = 50 - 100 = -50 (negative), but < 800 → still classified as sub.
+    // This handles tall main frames whose bounds extend below the sub-frame's top.
     const main = f('m', 0, 0)        // bottom = 100
-    const overlap = f('o', 0, 50)    // y=50, clearance = 50 - 100 = -50
+    const overlap = f('o', 0, 50)    // y=50, clearance = -50
     const result = classifyFrames([main, overlap])
-    expect(result.mainRows).toHaveLength(2)
-    expect(result.subFrameMap.size).toBe(0)
+    expect(result.mainRows).toHaveLength(1)
+    expect(result.subFrameMap.get('m')).toHaveLength(1)
   })
 
   it('two main rows each with their own sub-row', () => {
