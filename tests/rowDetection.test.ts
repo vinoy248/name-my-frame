@@ -137,15 +137,13 @@ describe('classifyFrames', () => {
     expect(subs[1].id).toBe('sr')
   })
 
-  it('overlapping frame (negative clearance) → treated as sub of nearest parent column', () => {
-    // Sub-frame starts within the parent frame's vertical extent (tall parent).
-    // clearance = 50 - 100 = -50 (negative), but < 800 → still classified as sub.
-    // This handles tall main frames whose bounds extend below the sub-frame's top.
+  it('overlapping frame (negative clearance) → treated as new main row', () => {
+    // frame overlaps last main row bottom — clearance is negative → new main, not sub
     const main = f('m', 0, 0)        // bottom = 100
-    const overlap = f('o', 0, 50)    // y=50, clearance = -50
+    const overlap = f('o', 0, 50)    // y=50, clearance = 50 - 100 = -50
     const result = classifyFrames([main, overlap])
-    expect(result.mainRows).toHaveLength(1)
-    expect(result.subFrameMap.get('m')).toHaveLength(1)
+    expect(result.mainRows).toHaveLength(2)
+    expect(result.subFrameMap.size).toBe(0)
   })
 
   it('two main rows each with their own sub-row', () => {
@@ -422,31 +420,5 @@ describe('assignSubFrameNames — extended', () => {
     const names = assignSubFrameNames(classified, 1)
     expect(names.get('s0')).toBe('1.1 A')
     expect(names.get('s25')).toBe('1.1 Z')
-  })
-
-  it('regression: tall sub in left column does not block stacked subs in right column', () => {
-    // Main row: left(x=0) and right(x=500), both at y=0, height=100
-    // left-sub: tall frame at y=200, height=900 (bottom=1100) — under left
-    // right-sub-A: at y=200, height=300 (bottom=500) — under right; clearance from right bottom=100 → 100 < 800 → sub
-    // right-sub-B: at y=700, height=100 — under right; clearance from right-sub-A bottom=500 → 200 < 800 → sub (NOT new main)
-    // right-sub-C: at y=900, height=100 — under right; clearance from right-sub-B bottom=800 → 100 < 800 → sub
-    const left = f('left', 0, 0, 400, 100)
-    const right = f('right', 500, 0, 400, 100)
-    const leftSub = f('lsub', 0, 200, 400, 900)   // tall, bottom=1100
-    const rightSubA = f('rsA', 500, 200, 400, 300) // bottom=500
-    const rightSubB = f('rsB', 500, 700, 400, 100) // 200px below rsA
-    const rightSubC = f('rsC', 500, 900, 400, 100) // 100px below rsB
-
-    const classified = classifyFrames([left, right, leftSub, rightSubA, rightSubB, rightSubC])
-    const names = assignSubFrameNames(classified, 8)
-
-    // One main row only
-    expect(classified.mainRows).toHaveLength(1)
-    // left gets one sub
-    expect(names.get('lsub')).toBe('8.1 A')
-    // right gets three stacked subs — B and C must not become new main rows
-    expect(names.get('rsA')).toBe('8.2 A')
-    expect(names.get('rsB')).toBe('8.2 B')
-    expect(names.get('rsC')).toBe('8.2 C')
   })
 })

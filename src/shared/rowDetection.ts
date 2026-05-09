@@ -45,59 +45,54 @@ export function assignNames(rows: FrameInfo[][], baseNumber: number): Map<string
 export function classifyFrames(frames: FrameInfo[]): ClassifiedFrames {
   if (frames.length === 0) return { mainRows: [], subFrameMap: new Map() }
 
+  // detectRows groups by Y proximity; iterate top-to-bottom and classify each group
   const allRows = detectRows(frames)
   const mainRows: FrameInfo[][] = []
   const subFrameMap = new Map<string, FrameInfo[]>()
-  // Per-parent column bottom: tracks the lowest edge of each parent (or its subs)
-  // so clearance is measured column-wise, not against the global max-bottom frame.
-  const colBottom = new Map<string, number>()
+  // Track bottom of the last processed row (main or sub) so that consecutive
+  // sub-rows with varying heights don't get mis-classified as main rows when
+  // measured against the tallest frame in the original main row.
+  let lastRowBottom = -Infinity
 
   for (const row of allRows) {
+    const rowTop = Math.min(...row.map(f => f.y))
+    const rowBottom = Math.max(...row.map(f => f.y + f.height))
+
     if (mainRows.length === 0) {
       mainRows.push(row)
-      for (const f of row) colBottom.set(f.id, f.y + f.height)
+      lastRowBottom = rowBottom
       continue
     }
 
-    const lastMainRow = mainRows[mainRows.length - 1]
+    const clearance = rowTop - lastRowBottom
 
-    type Assignment = { sub: FrameInfo; parent: FrameInfo }
-    const assignments: Assignment[] = []
-    let isSubRow = true
-
-    for (const sub of row) {
-      const subCenter = sub.x + sub.width / 2
-      let bestParent = lastMainRow[0]
-      let bestDist = Math.abs(subCenter - (bestParent.x + bestParent.width / 2))
-      for (const mf of lastMainRow.slice(1)) {
-        const dist = Math.abs(subCenter - (mf.x + mf.width / 2))
-        if (dist < bestDist) { bestDist = dist; bestParent = mf }
-      }
-
-      const bottom = colBottom.get(bestParent.id) ?? (bestParent.y + bestParent.height)
-      const clearance = sub.y - bottom
-      if (clearance >= 800) { isSubRow = false; break }
-      assignments.push({ sub, parent: bestParent })
-    }
-
-    if (isSubRow) {
-      for (const { sub, parent } of assignments) {
-        const existing = subFrameMap.get(parent.id) || []
+    if (clearance >= 0 && clearance < 800) {
+      // Sub-row: each frame assigned to closest parent by X center in last main row
+      const lastMainRow = mainRows[mainRows.length - 1]
+      for (const sub of row) {
+        const subCenter = sub.x + sub.width / 2
+        let bestParent = lastMainRow[0]
+        let bestDist = Math.abs(subCenter - (bestParent.x + bestParent.width / 2))
+        for (const mainFrame of lastMainRow.slice(1)) {
+          const dist = Math.abs(subCenter - (mainFrame.x + mainFrame.width / 2))
+          if (dist < bestDist) {
+            bestDist = dist
+            bestParent = mainFrame
+          }
+        }
+        const existing = subFrameMap.get(bestParent.id) || []
         existing.push(sub)
-        subFrameMap.set(parent.id, existing)
-        const prev = colBottom.get(parent.id) ?? (parent.y + parent.height)
-        colBottom.set(parent.id, Math.max(prev, sub.y + sub.height))
+        subFrameMap.set(bestParent.id, existing)
       }
     } else {
       mainRows.push(row)
-      colBottom.clear()
-      for (const f of row) colBottom.set(f.id, f.y + f.height)
     }
+
+    lastRowBottom = rowBottom
   }
 
-  // Sort subs by Y then X: handles stacked same-column subs correctly
   for (const [key, subs] of subFrameMap) {
-    subFrameMap.set(key, subs.slice().sort((a, b) => a.y - b.y || a.x - b.x))
+    subFrameMap.set(key, subs.slice().sort((a, b) => a.x - b.x))
   }
 
   return { mainRows, subFrameMap }
